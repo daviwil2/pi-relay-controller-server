@@ -1,10 +1,14 @@
 {
   "name": "pi-relay-controller",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Allow control of GPIO-connected relays over HTTP interface from a Raspberry Pi Zero W",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daviwil2/pi-relay-controller.git"
   },
   "author": "David Williamson",
   "license": "ISC",
@@ -19,7 +23,6 @@
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
     "csrf": "^3.1.0",
-    "mdns": "^2.5.1",
     "request-ip": "^2.1.3",
     "rpi-gpio": "^2.1.7"
   }

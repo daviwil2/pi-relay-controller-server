@@ -1,14 +1,14 @@
 {
   "log": {
     "level": 10,
-    "name": "relay-controller"
+    "name": "pi-relay-controller"
   },
   "gpio": {
     "relays": {
-      "1": {"id": 1, "name": "GPIO (#238)", "pin": 12},
-      "2": {"id": 2, "name": "GPIO (#239)", "pin": 13},
-      "3": {"id": 3, "name": "GPIO (#237)", "pin": 15},
-      "4": {"id": 4, "name": "GPIO (#236)", "pin": 16}
+      "1": {"id": 1, "name": "GPIO4", "pin": 7},
+      "2": {"id": 2, "name": "GPIO17", "pin": 11},
+      "3": {"id": 3, "name": "GPIO27", "pin": 13},
+      "4": {"id": 4, "name": "GPIO22", "pin": 15}
     },
     "default": "NC"
   }

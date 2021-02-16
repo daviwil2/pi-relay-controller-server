@@ -1,0 +1,15 @@
+{
+  "log": {
+    "level": 10,
+    "name": "relay-controller"
+  },
+  "gpio": {
+    "relays": {
+      "1": {"id": 1, "name": "GPIO (#238)", "pin": 12},
+      "2": {"id": 2, "name": "GPIO (#239)", "pin": 13},
+      "3": {"id": 3, "name": "GPIO (#237)", "pin": 15},
+      "4": {"id": 4, "name": "GPIO (#236)", "pin": 16}
+    },
+    "default": "NC"
+  }
+}

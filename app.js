@@ -24,13 +24,9 @@ function _reformatArray(array, suppressApostrophes){
   };
   formatted = formatted + ' and ' + apostrophe + array[num-1] + apostrophe;
   return formatted;
-};
+}; // _reformatArray
 
 log.debug('running versions '+_reformatArray(_.map(process.versions, function(version, module){ return module+' '+version }), true));
-
-_.forOwn(config.streams, (value, key)=>{
-  log.trace('stream \''+key+'\' mapped to uri \''+value+'\'');
-}); // _.forOwn
 
 // Create our express application
 var app = express();

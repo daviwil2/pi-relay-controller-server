@@ -10,6 +10,6 @@
       "3": {"id": 3, "name": "GPIO27", "pin": 13},
       "4": {"id": 4, "name": "GPIO22", "pin": 15}
     },
-    "default": "NC"
+    "default": "NO"
   }
 }

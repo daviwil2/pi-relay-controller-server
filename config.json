@@ -5,10 +5,10 @@
   },
   "gpio": {
     "relays": {
-      "1": {"id": 1, "name": "GPIO4", "pin": 7},
-      "2": {"id": 2, "name": "GPIO17", "pin": 11},
-      "3": {"id": 3, "name": "GPIO27", "pin": 13},
-      "4": {"id": 4, "name": "GPIO22", "pin": 15}
+      "1": {"id": 1, "name": "GPIO19", "pin": 35},
+      "2": {"id": 2, "name": "GPIO13", "pin": 33},
+      "3": {"id": 3, "name": "GPIO6",  "pin": 31},
+      "4": {"id": 4, "name": "GPIO5",  "pin": 29}
     },
     "default": "NO"
   }

@@ -1,0 +1,78 @@
+// enums.proto
+
+// defines the enums for all the fields in Service defined in service.proto
+
+syntax = "proto3"; // use v3 of the protobuf specification
+
+package com.github.daviwil2.grpc.v1;
+
+// data describing each of the four (4) pins with connected relay and GPIO number
+// used to populate a getPinsResponse in response to a getPinsRequest
+// define all the enums first, then the attributes in a block at the bottom
+enum Pin {
+  PIN_UNSPECIFIED = 0;
+  PIN_29 = 1;
+  PIN_31 = 2;
+  PIN_33 = 3;
+  PIN_35 = 4;
+}
+
+enum Relay {
+  RELAY_UNSPECIFIED = 0;
+  RELAY_1 = 1;
+  RELAY_2 = 2;
+  RELAY_3 = 3;
+  RELAY_4 = 4;
+}
+
+enum GPIO {
+  GPIO_UNSPECIFIED = 0;
+  GPIO_19 = 1;
+  GPIO_13 = 2;
+  GPIO_6  = 3;
+  GPIO_5  = 4;
+}
+
+// taken from https://developer.athom.com/docs/apps-reference
+enum Controls {
+  CONTROLS_UNSPECIFIED   = 0;
+  CONTROLS_AMPLIFIER     = 1;
+  CONTROLS_BLINDS        = 2;
+  CONTROLS_COFFEEMACHINE = 3;
+  CONTROLS_CURTAIN       = 4;
+  CONTROLS_FAN           = 5;
+  CONTROLS_GARAGEDOOR    = 6;
+  CONTROLS_HEATER        = 7;
+  CONTROLS_LIGHT         = 8;
+  CONTROLS_LOCK          = 9;
+  CONTROLS_OTHER         = 10;
+  CONTROLS_SOCKET        = 11;
+  CONTROLS_SUNSHADE      = 12;
+  CONTROLS_TV            = 13;
+}
+
+enum Type {
+  TYPE_UNSPECIFIED = 0;
+  TYPE_NO = 1;
+  TYPE_NC = 2;
+}
+
+// define the enums used for the nested message Power
+
+enum PowerType {
+  POWER_TYPE_UNSPECIFIED = 0;
+  POWER_TYPE_AC = 1;
+  POWER_TYPE_DC = 2;
+}
+
+enum Voltage {
+  VOLTAGE_UNSPECIFIED = 0;
+  VOLTAGE_5V   = 1;
+  VOLTAGE_12V  = 2;
+  VOLTAGE_24V  = 3;
+  VOLTAGE_100V = 4;
+  VOLTAGE_110V = 5;
+  VOLTAGE_220V = 6;
+  VOLTAGE_230V = 7;
+  VOLTAGE_240V = 8;
+}

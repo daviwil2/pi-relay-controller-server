@@ -1,0 +1,9 @@
+version: v1beta1
+
+build:
+  roots:
+      - .
+
+lint:
+  use:
+    - DEFAULT # the strictest level in buf

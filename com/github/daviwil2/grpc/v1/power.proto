@@ -1,0 +1,13 @@
+// power.proto
+
+syntax = "proto3"; // use v3 of the protobuf specification
+
+package com.github.daviwil2.grpc.v1;
+
+import "com/github/daviwil2/grpc/v1/enums.proto";  // contains all enum definitions
+
+// define the message Power which is nested in the message Service
+message Power {
+  PowerType type = 1;
+  Voltage voltage = 2;
+}

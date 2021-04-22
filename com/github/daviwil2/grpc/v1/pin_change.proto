@@ -1,0 +1,18 @@
+// pin_change.proto
+
+syntax = "proto3"; // use v3 of the protobuf specification
+
+package com.github.daviwil2.grpc.v1;
+
+import "google/protobuf/timestamp.proto";
+import "com/github/daviwil2/grpc/v1/enums.proto";  // contains all enum definitions
+
+// used to populate a setPinResponse in response to a setPinRequest
+message PinChange {
+
+  google.protobuf.Timestamp timestamp = 1; // per https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp
+  Relay relay    = 2; // the relay number [1-4] for the SB Components shield
+  bool succeeded = 3; // did the change to turn on or off succeed? 1 = yes, 0 = no
+  bool state     = 4; // the new current state
+
+}

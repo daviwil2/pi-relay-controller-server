@@ -1,0 +1,35 @@
+// service.proto defines the API and messages related to that API
+
+syntax = "proto3"; // use v3 of the protobuf specification
+
+package com.github.daviwil2.grpc.v1;
+
+import "com/github/daviwil2/grpc/v1/pi_relay.proto";   // defines the message for PiRelay
+import "com/github/daviwil2/grpc/v1/pin_change.proto"; // defines the message for PinChange
+
+// simple API where the client sends a request to the server using a stub and waits for a response,
+// just like a normal function call, not using streaming (the stream keyboard prefixing the parameter)
+service PiRelayService {
+
+  // retrieves the available pins and their metadata
+  rpc GetPins(GetPinsRequest) returns (GetPinsResponse);
+
+  // sets the state of a pin
+  rpc SetPin(SetPinRequest) returns (SetPinResponse);
+
+}
+
+// no parameters specified, all pins are returned
+message GetPinsRequest {}
+
+message GetPinsResponse {
+  repeated PiRelay pin = 1;
+}
+
+message SetPinRequest {
+  int32 pin = 1;
+}
+
+message SetPinResponse {
+  PinChange response = 1;
+}

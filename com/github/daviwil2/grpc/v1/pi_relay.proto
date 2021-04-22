@@ -1,0 +1,25 @@
+// service.proto defines the API and messages related to that API
+
+syntax = "proto3"; // use v3 of the protobuf specification
+
+package com.github.daviwil2.grpc.v1;
+
+import "com/github/daviwil2/grpc/v1/enums.proto";      // contains all enum definitions
+import "com/github/daviwil2/grpc/v1/power.proto";      // defines the message for PinChange
+
+message PiRelay {
+
+  Pin pin          = 1; // the pin number [29, 31, 33 or 35] for the SB Components shield
+  Relay relay      = 2; // the relay number linked to the pin number [1-4]
+  GPIO gpio        = 3; // the GPIO number linked to the pin number [19, 13, 6, 5]
+  string name       = 4;
+  Controls controls = 5; // text description of what it controls from the enum list
+  Type type        = 6;
+  bool state        = 7; // 1 for activated, 0 for not activated
+  Power power       = 8;
+
+  // for future use
+  reserved "MQTTtopic"; // reserve this field name for future use
+  reserved 9;           // with this corresponding field number
+
+}

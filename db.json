@@ -1,0 +1,28 @@
+{
+  "relays": [
+    {
+      "relay": 1,
+      "gpio": "GPIO_19",
+      "name": "Relay 1",
+      "pin": 35
+    },
+    {
+      "relay": 2,
+      "gpio": "GPIO_13",
+      "name": "Relay 2",
+      "pin": 33
+    },
+    {
+      "relay": 3,
+      "gpio": "GPIO_6",
+      "name": "Relay 3",
+      "pin": 31
+    },
+    {
+      "relay": 4,
+      "gpio": "GPIO_5",
+      "name": "Relay 4",
+      "pin": 29
+    }
+  ]
+}

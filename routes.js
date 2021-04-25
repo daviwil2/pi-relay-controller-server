@@ -18,6 +18,18 @@ module.exports = exports = function(app, config, log){
   const OFF = (config.gpio.default == 'NC') ? 0 : 1 ;
   const ON  = (OFF === 0) ? 1 : 0 ;
 
+  /*
+  "gpio": {
+    "relays": {
+      "1": {"id": 1, "name": "GPIO19", "pin": 35},
+      "2": {"id": 2, "name": "GPIO13", "pin": 33},
+      "3": {"id": 3, "name": "GPIO6",  "pin": 31},
+      "4": {"id": 4, "name": "GPIO5",  "pin": 29}
+    },
+    "default": "NO"
+  },
+  */
+
   // populate the relays array with an object for each relay, {id, name, pin, state}
   _.forEach(config.gpio.relays, (obj, key) => {
     obj.state = 'off'; // add the default state, off or on, to the object
@@ -66,7 +78,7 @@ module.exports = exports = function(app, config, log){
   app.put('/API/set', bodyParser.json(), function(req, res, next){
 
     let relay = (req.query.relay) ? req.query.relay : undefined ;
-    relay = (relay !== undefined) ? parseInt(relay, 10) : undefined ;
+    relay = (relay !== undefined) ? parseInt(relay, 10) : undefined ; // base 10
 
     let desiredState = (req.query.state) ? req.query.state : undefined ;
     desiredState = ([1, '1', true, 'open', 'on'].indexOf(desiredState) === -1) ? OFF : ON ; // default to OFF
@@ -96,6 +108,7 @@ module.exports = exports = function(app, config, log){
 
   }); // app.put
 
+  /*
   /// error messages, need to be replaced with handlebars-rendered pages that can be displayed in the main region
 
   // 404 path not found
@@ -120,5 +133,6 @@ module.exports = exports = function(app, config, log){
     }); // res.render
 
   }); // app.use
+  */
 
 } // module.exports

@@ -9,6 +9,7 @@ var protoLoader = require('@grpc/proto-loader');
 // YAML 1.2 parser
 var yaml        = require('js-yaml');
 var fs          = require('fs');
+let networkInterfaces = require('os').networkInterfaces;
 
 // load configuration from YAML file
 try {
@@ -17,15 +18,17 @@ try {
   process.exit(0);
 }; // try/catch
 
+var bonjour = require('bonjour')();
+
 var log         = require('./lib/log.js')(config);           // logger
 var db          = require('./lib/db.js')(config, log);       // abstracts access to the lowdb database
 var gpio        = require('./lib/gpio.js')(config, log, db); // allows control of the GPIO pins
 var ssl         = require('./lib/ssl.js')(config, log, db);  // retrieves or generates SSL certificates
 
-var certificates = ssl.getCertificates();
 var stub, server, serverType;
+var certificates = ssl.getCertificates(); // either returns certificates array or null
 
-// call function to validate that the database is present and, if not, initialise it
+// validate that the database is present and, if not, initialise it
 db.initialise((err) => {
   if(err){
     log.fatal(err.message);
@@ -33,10 +36,12 @@ db.initialise((err) => {
   }; // if
 }); // db.initialise
 
+// define constants
 const MAXTIMEOUT      = 10000; // 10000ms = 10s
 const DEFAULTTIMEOUT  = 2000;  // 2000ms = 2s
 const MAXINTERVAL     = 1000;  // 1000ms = 1s
 const DEFAULTINTERVAL = 50;    // 50ms = 0.05s
+const BONJOURNAME = (config.bonjour.name) ? config.bonjour.name : 'pi-relay-controller-server' ;
 
 // define how the relay is in an off state; if NC then 0 if NO then 1
 const OFF = (config.gpio.default == 'NC') ? 0 : 1 ;
@@ -44,7 +49,7 @@ const ON  = (OFF === 0) ? 1 : 0 ;
 
 log.debug('running versions '+_reformatObject(process.versions, true));
 
-// create a server instance of the appropriate type to which services will be bound and then started
+// create a gRPC server instance of the appropriate type to which services will be bound and then started
 var serverCredentials = null;
 try {
   // if a secure server is preferred and we have certificates then try to create a secure server instance
@@ -62,15 +67,16 @@ try {
   process.exit(0);
 }; // try/catch
 
-var address = config.gRPC.server.host + ':' + config.gRPC.server.portSecure.toString();
+var port = config.gRPC.server.portSecure.toString();
+var address = config.gRPC.server.host + ':' + port;
 
 // build the gRPC API
 const PROTO_PATH = __dirname + '/com/github/daviwil2/grpc/v1/service.proto'; // this is the master protobuf file that loads all the dependent files
 var packageDefinition = protoLoader.loadSync(
   PROTO_PATH,
   { keepCase: true, // preserve field names, don't convert to camelCase
-    longs: "String",
-    enums: "String",
+    longs: 'String',
+    enums: 'String',
     defaults: true,
     oneofs: true
   }
@@ -85,7 +91,7 @@ var protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
 */
 stub = protoDescriptor.com.github.daviwil2.grpc.v1.PiRelayService;
 
-/// helper functions
+/// internal helper functions
 
 function _reformatObject(obj, suppressApostrophes){
 
@@ -140,6 +146,32 @@ function _waitForServerToStart(server, timeout, interval){
 
 }; // _waitForServerToStart
 
+function _validateBonjourPublication(){
+
+  let interfaces = networkInterfaces();
+  let results = [];
+  let name, i;
+
+  for (name of Object.keys(interfaces)) {
+    for (i of interfaces[name]) {
+      if (i.family === 'IPv4' && !i.internal) { // ignore IPv6 and internal addresses
+        results.push(i.address);
+      }; // if
+    }; // for
+  }; // for
+
+  bonjour.find({type: 'http'}, (service) => {
+    if (service.name === BONJOURNAME){ // if it's name is the same as we're publishing under
+      service.addresses.forEach((address) => { // iterate over all of the IP addresses this service is advertising on
+        if (results.indexOf(address) !== -1){ // if this address is one that this server is using we've found it
+          log.trace('server successfully published on Bonjour/mDNS-SD');
+        }; // if
+      }); // service.address.forEach
+    }; // if
+  }); // bonjour.find
+
+}; // _validateBonjourPublication
+
 /// define functions called by gRPC API calls
 
 // get one or all pins from lowdb; {obj.request.relay} will be 0 for all relays or 1-4 for one of the available relays
@@ -153,10 +185,14 @@ function _getRelays(obj, callback){
   // read from lowdb here via db. calls
   // db.getRelays
 
-  //  mock
-  let response = {piRelays: [{pin: 'PIN_33', name: 'fred'}, {name: 'joe'}]}; // 'PIN_33' is returned a number 3 per .proto file enum definitions, all other fields default to 0 etc.
-
-  callback(null, response);
+  // let response = {piRelays: [{pin: 'PIN_33', name: 'fred'}, {name: 'joe'}]}; // 'PIN_33' is returned a number 3 per .proto file enum definitions, all other fields default to 0 etc.
+  let reponse = db.getRelays();
+  console.log(response);
+  if (response instanceof Error){
+    callback(response, null)
+  } else {
+    callback(null, response);
+  };
 
 }; // _getRelays
 
@@ -199,7 +235,7 @@ server.addService(stub.service, {
   RenameRelay: _renameRelay
 }); // server.addService
 
-// bind and and then start the gRPC server
+// bind the serverCredentials instance we created earlier and then start the gRPC server
 server.bindAsync(address, serverCredentials, (err, port) => {
 
   if (err){
@@ -215,6 +251,9 @@ server.bindAsync(address, serverCredentials, (err, port) => {
     _waitForServerToStart(server, 2500, 50)
     .then(() => {
       log.debug(serverType+' server started and listening...');
+      bonjour.publish({ name: BONJOURNAME, type: 'http', port: port });
+      log.debug('advertising server via Bonjour/mDNS-SD');
+      _validateBonjourPublication();
     })
     .catch((err) => {
       log.fatal(err.message);

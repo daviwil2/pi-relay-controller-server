@@ -38,3 +38,6 @@ gRPC:
     host: localhost
     portSecure: 50051
     portInsecure: 50051
+
+bonjour:
+  name: pi-relay-controller-server

@@ -1,10 +1,11 @@
 {
   "name": "pi-relay-controller",
   "version": "0.0.1",
-  "description": "Allow control of GPIO-connected relays over HTTP interface from a Raspberry Pi Zero W",
+  "description": "Allow control of GPIO-connected relays over HTTP interface from a Raspberry Pi",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js"
   },
   "repository": {
     "type": "git",
@@ -15,14 +16,9 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.2.12",
     "@grpc/proto-loader": "^0.6.1",
-    "body-parser": "^1.19.0",
+    "bonjour": "^3.5.0",
     "bunyan": "^1.8.15",
     "bunyan-format": "^0.2.1",
-    "compression": "^1.7.4",
-    "cors": "^2.8.5",
-    "csrf": "^3.1.0",
-    "express": "^4.17.1",
-    "helmet": "^4.4.1",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.20",
     "lowdb": "^1.0.0",

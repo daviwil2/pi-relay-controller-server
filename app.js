@@ -17,11 +17,13 @@ try {
   process.exit(0);
 }; // try/catch
 
-var log         = require('./lib/log.js')(config);
-var db          = require('./lib/lowdb.js')(config, log);
-var gpio        = require('./lib/gpio.js')(config, log, db);
+var log         = require('./lib/log.js')(config);           // logger
+var db          = require('./lib/db.js')(config, log);       // abstracts access to the lowdb database
+var gpio        = require('./lib/gpio.js')(config, log, db); // allows control of the GPIO pins
+var ssl         = require('./lib/ssl.js')(config, log, db);  // retrieves or generates SSL certificates
 
-var stub, server;
+var certificates = ssl.getCertificates();
+var stub, server, serverType;
 
 // call function to validate that the database is present and, if not, initialise it
 db.initialise((err) => {
@@ -42,8 +44,25 @@ const ON  = (OFF === 0) ? 1 : 0 ;
 
 log.debug('running versions '+_reformatObject(process.versions, true));
 
-var address = config.gRPC.server.host+':'+config.gRPC.server.port.toString();
-var serverCredentials = grpc.ServerCredentials.createInsecure();
+// create a server instance of the appropriate type to which services will be bound and then started
+var serverCredentials = null;
+try {
+  // if a secure server is preferred and we have certificates then try to create a secure server instance
+  serverCredentials = (config.ssl.secure === true && certificates !== null) ?  grpc.ServerCredentials.createSsl(null, certificates, false) : null ;
+  // if we don't have a secure server instance and fallback to insecure is enabled then try to create an insecure server instance
+  serverCredentials = (serverCredentials === null && config.ssl.fallbackToInsecure === true) ? grpc.ServerCredentials.createInsecure() : serverCredentials ;
+  // trap for not having a server instance of any kind
+  if (!serverCredentials){
+    throw new Error('unable to create either secure or insecure gRPC server instance');
+  }; // if
+  serverType = (serverCredentials.options && serverCredentials.options.cert) ? 'secure' : 'insecure' ;
+  // serverType = ()
+} catch(err) {
+  log.fatal(err.message);
+  process.exit(0);
+}; // try/catch
+
+var address = config.gRPC.server.host + ':' + config.gRPC.server.portSecure.toString();
 
 // build the gRPC API
 const PROTO_PATH = __dirname + '/com/github/daviwil2/grpc/v1/service.proto'; // this is the master protobuf file that loads all the dependent files
@@ -160,7 +179,11 @@ function _setRelay(relay, desiredState, callback){
 
 }; // _setRelay
 
+// TODO: rename a relay
 function _renameRelay(relay, newName, callback){
+
+  // ...
+  callback(null, true);
 
 }; // _rename
 
@@ -176,26 +199,28 @@ server.addService(stub.service, {
   RenameRelay: _renameRelay
 }); // server.addService
 
-// bind and start the gRPC server
-server.bindAsync(config.gRPC.server.host+':'+config.gRPC.server.port.toString(),
-  serverCredentials,
-  (err, port) => {
-    if (err){
+// bind and and then start the gRPC server
+server.bindAsync(address, serverCredentials, (err, port) => {
+
+  if (err){
+
+    log.fatal(err.message);
+    process.exit(0);
+
+  } else {
+
+    log.trace('server bound on '+address+', starting '+serverType+' server');
+    server.start();
+
+    _waitForServerToStart(server, 2500, 50)
+    .then(() => {
+      log.debug(serverType+' server started and listening...');
+    })
+    .catch((err) => {
       log.fatal(err.message);
       process.exit(0);
-    } else {
+    }); // _waitForServerToStart
 
-      log.trace('server bound on '+config.gRPC.server.host+':'+port+', starting server');
-      server.start();
+  }; // if
 
-      _waitForServerToStart(server, 2500, 50)
-      .then(() => {
-        log.debug('server started and listening...');
-      })
-      .catch((err) => {
-        log.fatal(err.message);
-        process.exit(0);
-      }); // _waitForServerToStart
-
-    }; // if
 }); // server.bindAsync

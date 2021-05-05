@@ -77,7 +77,7 @@ stub = protoDescriptor.com.github.daviwil2.grpc.v1.PiRelayService;
 log.trace('setting all relays to '+config.initialState);
 let initialState = (config.initialState === 'on') ? 1 : 0 ;
 for (let r = 1; r <= 4; r++){
-  _setRelay({request: {relay: r, state: false}}, (err, response) => {} );
+  _setRelay({request: {relay: r, state: 0}}, (err, response) => {} );
 }; // for
 
 /// internal helper functions
@@ -257,24 +257,33 @@ function _setRelay(obj, callback){
 // TODO: rename a relay; obj.relay, obj.oldName, obj.newName
 function _renameRelay(obj, callback){
 
-  // ...
-  console.log(obj);
+  let relay = obj.request.relay;
+  let newName = obj.request.newName;
+
+  // write the new name to the database
+  db.renameRelay(relay, newName);
+
+  // construct the response object
   let timestamp = Math.round((new Date()).getTime() / 1000); // get unix timestamp, i.e. the seconds since start of unix epoch
-  let response = callback(err, {timestamp: {seconds: timestamp, nanos: 0}, relay: 1, succeeded: true});
+  let response = callback(null, {timestamp: {seconds: timestamp, nanos: 0}, relay: 1, succeeded: true});
+
+  log.trace('renamed relay '+relay.toString()+' to \''+newName+'\'');
+
+  // return errback with no error and the response object
   callback(null, response);
 
-}; // _rename
+}; // _renameRelay
 
 /// gRPC server starts here
 
 // define a gRPC server
 server = new grpc.Server();
 
-// add services with local functions getPins and setPin mapping to the API functions GetPins and SetPin
+// add methods that this server implements, mapped to functions above
 server.addService(stub.service, {
-  GetRelays: _getRelays,
-  SetRelay: _setRelay,
-  RenameRelay: _renameRelay
+  GetRelays   : _getRelays,
+  SetRelay    : _setRelay,
+  RenameRelay : _renameRelay
 }); // server.addService
 
 // bind the serverCredentials instance we created earlier and then start the gRPC server

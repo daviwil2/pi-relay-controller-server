@@ -11,18 +11,22 @@ gpio:
       gpio: GPIO_19
       name: Relay 1
       pin: 35
+      state: 0
     - relay: 2
       gpio: GPIO_13
       name: Relay 2
       pin: 33
+      state: 0
     - relay: 3
       gpio: GPIO_6
       name: Relay 3
       pin: 31
+      state: 0
     - relay: 4
       gpio: GPIO_5
       name: Relay 4
       pin: 29
+      state: 0
 
 gRPC:
   server:

@@ -23,21 +23,10 @@ gpio:
       gpio: GPIO_5
       name: Relay 4
       pin: 29
-  default: NO
-
-ssl:
-  secure: true             # true to prefer to create a server that accepts SSL connections
-  fallbackToInsecure: true # fallback to insecure if for some reason we can't create a secure server
-  defaults:
-    - name: 'commonName'
-      value: dummy.org
-  options: !!map { keySize: 2048, days: 3650, clientCertificate: false, pkcs7: false }
 
 gRPC:
   server:
-    host: localhost
-    portSecure: 50051
-    portInsecure: 50051
+    host: 192.168.1.149
+    port: 50051
 
-bonjour:
-  name: pi-relay-controller-server
+initialState: off

@@ -1,4 +1,4 @@
-// ./app.js
+// ./app.js for pi-relay-controller-server
 
 'use strict';
 
@@ -18,15 +18,13 @@ try {
   process.exit(0);
 }; // try/catch
 
-var bonjour = require('bonjour')();
+var mdns        = require('mdns');
 
 var log         = require('./lib/log.js')(config);           // logger
 var db          = require('./lib/db.js')(config, log);       // abstracts access to the lowdb database
 var gpio        = require('./lib/gpio.js')(config, log, db); // allows control of the GPIO pins
-var ssl         = require('./lib/ssl.js')(config, log, db);  // retrieves or generates SSL certificates
 
-var stub, server, serverType;
-var certificates = ssl.getCertificates(); // either returns certificates array or null
+var stub, server, advertisment, serverCredentials;
 
 // validate that the database is present and, if not, initialise it
 db.initialise((err) => {
@@ -41,34 +39,18 @@ const MAXTIMEOUT      = 10000; // 10000ms = 10s
 const DEFAULTTIMEOUT  = 2000;  // 2000ms = 2s
 const MAXINTERVAL     = 1000;  // 1000ms = 1s
 const DEFAULTINTERVAL = 50;    // 50ms = 0.05s
-const BONJOURNAME = (config.bonjour.name) ? config.bonjour.name : 'pi-relay-controller-server' ;
 
-// define how the relay is in an off state; if NC then 0 if NO then 1
-const OFF = (config.gpio.default == 'NC') ? 0 : 1 ;
-const ON  = (OFF === 0) ? 1 : 0 ;
+const OFF             = 0;     // low
+const ON              = 1;     // high
 
 log.debug('running versions '+_reformatObject(process.versions, true));
 
-// create a gRPC server instance of the appropriate type to which services will be bound and then started
-var serverCredentials = null;
-try {
-  // if a secure server is preferred and we have certificates then try to create a secure server instance
-  serverCredentials = (config.ssl.secure === true && certificates !== null) ?  grpc.ServerCredentials.createSsl(null, certificates, false) : null ;
-  // if we don't have a secure server instance and fallback to insecure is enabled then try to create an insecure server instance
-  serverCredentials = (serverCredentials === null && config.ssl.fallbackToInsecure === true) ? grpc.ServerCredentials.createInsecure() : serverCredentials ;
-  // trap for not having a server instance of any kind
-  if (!serverCredentials){
-    throw new Error('unable to create either secure or insecure gRPC server instance');
-  }; // if
-  serverType = (serverCredentials.options && serverCredentials.options.cert) ? 'secure' : 'insecure' ;
-  // serverType = ()
-} catch(err) {
-  log.fatal(err.message);
-  process.exit(0);
-}; // try/catch
+// create gRPC server instance; we use insecure rather than SSL/TLS as the latter isn't suppotted on ARM processors
+log.trace('creating serverCredentials as insecure');
+serverCredentials = grpc.ServerCredentials.createInsecure();
 
-var port = config.gRPC.server.portSecure.toString();
-var address = config.gRPC.server.host + ':' + port;
+var port    = config.gRPC.server.port.toString();
+var address = config.gRPC.server.host;
 
 // build the gRPC API
 const PROTO_PATH = __dirname + '/com/github/daviwil2/grpc/v1/service.proto'; // this is the master protobuf file that loads all the dependent files
@@ -90,6 +72,13 @@ var protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
  * Per the API defined in service.proto the methods GetPins() and SetPin() are defined on .service
 */
 stub = protoDescriptor.com.github.daviwil2.grpc.v1.PiRelayService;
+
+// set the state of all teh relays to off and update the database with that state
+log.trace('setting all relays to '+config.initialState);
+let initialState = (config.initialState === 'on') ? 1 : 0 ;
+for (let r = 1; r <= 4; r++){
+  _setRelay({request: {relay: r, state: false}}, (err, response) => {} );
+}; // for
 
 /// internal helper functions
 
@@ -129,7 +118,7 @@ function _waitForServerToStart(server, timeout, interval){
       reject(new Error('timed out'));
     }, timeout);
 
-    // define a function that will check the condition and resolve if it is truthy, recursively callingitself
+    // define a function that will check the condition and resolve if it is truthy, recursively calling itself
     function _wait(){
       if (server.started){
         clearTimeout(waitFunction);
@@ -146,8 +135,11 @@ function _waitForServerToStart(server, timeout, interval){
 
 }; // _waitForServerToStart
 
-function _validateBonjourPublication(){
+function _validateMDNSPublication(){
 
+  log.trace('validating MDNS publication...');
+
+  // build a list of IP addresses on this host
   let interfaces = networkInterfaces();
   let results = [];
   let name, i;
@@ -160,66 +152,116 @@ function _validateBonjourPublication(){
     }; // for
   }; // for
 
-  bonjour.find({type: 'http'}, (service) => {
-    if (service.name === BONJOURNAME){ // if it's name is the same as we're publishing under
-      service.addresses.forEach((address) => { // iterate over all of the IP addresses this service is advertising on
-        if (results.indexOf(address) !== -1){ // if this address is one that this server is using we've found it
-          log.trace('server successfully published on Bonjour/mDNS-SD');
-        }; // if
-      }); // service.address.forEach
+  let message = (results.length == 1) ? 'interface' : 'interfaces';
+  log.trace('found ' + results.length.toString() + ' ' + message);
+
+  let sequence = [
+    mdns.rst.DNSServiceResolve() // resolve host name and port
+  ]; // sequence
+  var browser = mdns.createBrowser(mdns.tcp('grpc'), { resolverSequence: sequence });
+
+  log.trace('MDNS browser instance created');
+
+  browser.on('serviceUp', function(service) {
+    if (service.txtRecord && service.txtRecord.ip){
+      if (results.indexOf(service.txtRecord.ip) !== -1){
+        log.trace('server successfully published on mDNS-SD at address '+address);
+        browser.stop();
+        log.trace('MDNS browser instance stopped');
+      }; // if
     }; // if
-  }); // bonjour.find
+  }); // browser.on
 
-}; // _validateBonjourPublication
+  browser.on('error', (err) => { log.error(err.message) });
 
-/// define functions called by gRPC API calls
+  browser.start();
+
+}; // _validateMDNSPublication
+
+function _validategRPCserver(address, port){
+
+  // build the gRPC API
+  // PROTO_PATH, packageDefinition, protoDescriptor and stub are all defined earlier when the server was instantiated
+
+  let client;
+
+  log.info('trying to open test gRPC connection to '+address+':'+port);
+
+  client = new stub(address+':'+port, grpc.credentials.createInsecure());
+  log.trace('calling client.getRelays() over secure gRPC connection');
+
+  // make gRPC call over the connection
+  client.getRelays({}, (err, data) => {
+    if (err){
+      log.error('failed: '+err.message)
+    } else {
+      let message = (data.piRelays.length > 1) ? ' relays' : ' relay' ;
+      log.trace('succeeded: records for ', data.piRelays.length.toString() + message + ' returned');
+    }; // if
+  }); // client.getRelays
+
+}; // _validategRPCserver
+
+/// define the functions defined as the API for gRPC calls
 
 // get one or all pins from lowdb; {obj.request.relay} will be 0 for all relays or 1-4 for one of the available relays
 function _getRelays(obj, callback){
 
-  console.log('_getRelays() called');
-  console.log('obj.request', obj.request); // should be an object with .relay
-  console.log(obj.request.relay)
-  console.log('callback is a', typeof callback);
+  // construct paramter; either null for all relays or a number [1-4] for a specific relay
+  let parameter = (obj.request && obj.request.hasOwnProperty('relay') && obj.request.relay !== 0) ? obj.request.relay : null ;
 
-  // read from lowdb here via db. calls
-  // db.getRelays
-
-  // let response = {piRelays: [{pin: 'PIN_33', name: 'fred'}, {name: 'joe'}]}; // 'PIN_33' is returned a number 3 per .proto file enum definitions, all other fields default to 0 etc.
-  let reponse = db.getRelays();
-  console.log(response);
-  if (response instanceof Error){
-    callback(response, null)
-  } else {
-    callback(null, response);
-  };
+  db.getRelays(parameter, (err, response) => {
+    if (err){
+      log.error('error returned when calling db.getRelays: '+err.message);
+      callback(err, {piRelays: []} );
+    } else {
+      let plural = (response.length === 1) ? 'relay' : 'relays' ;
+      log.trace('returning data for '+response.length.toString()+' '+plural);
+      callback(null, {piRelays: response});
+    }; // if
+  }); // db.getRelays
 
 }; // _getRelays
 
 // set the state of the relay returning (err, result)
-function _setRelay(relay, desiredState, callback){
+function _setRelay(obj, callback){
 
-  desiredState = ([1, '1', true, 'open', 'on'].indexOf(desiredState) === -1) ? OFF : ON ; // default to OFF
-  let desiredStateText = (desiredState === ON) ? 'on' : 'off' ;
-
-  // trap for malformed relay number
-  if (relay == undefined || typeof relay !== 'number'){
-    return (new Error('relay number not passed or malformed in _setRelay'), null);
+  if (!obj.request || !obj.request.hasOwnProperty('relay') && !obj.request.hasOwnProperty('state')){
+    callback(new Error('incorrect parameters passed to _setRelay'))
   }; // if
 
-  // set the relay state which will trigger the database update in a callback via a .poll
-  log.trace('setting state of relay '+relay+' to '+desiredStateText);
-  gpio.set({relay: relay}, desiredState); // function imported from ./lib/gpio.js
+  let desiredState = ([1, '1', true, 'open', 'on'].indexOf(obj.request.state) === -1) ? OFF : ON ; // default to OFF
+  let desiredStateText = (desiredState === OFF) ? 'off' : 'on' ;
+  let relay = obj.request.relay;
 
-  callback(null, {relay: relay, state: desiredState});
+  // trap for malformed relay number
+  if (relay === null || typeof relay !== 'number' || relay <1 || relay >4){
+    callback(new Error('relay number not passed or malformed in _setRelay'), null);
+  }; // if
+
+  // set the relay state which will trigger the database update in a callback via a .poll in ./lib/gpio.js
+  log.trace('setting state of relay '+relay+' to '+desiredStateText);
+  let timestamp = Math.round((new Date()).getTime() / 1000); // get unix timestamp, i.e. the seconds since start of unix epoch
+  gpio.set({relay: relay}, desiredState)
+  .then(() => {
+    log.trace('successfully set state of relay '+relay+' to '+desiredStateText);
+    callback(null, {timestamp: {seconds: timestamp, nanos: 0}, relay: relay, succeeded: true, state: desiredState});
+  })
+  .catch((err) => {
+    log.error('error setting state of relay '+relay+' to '+desiredStateText+': '+err.message);
+    callback(err, {timestamp: {seconds: timestamp, nanos: 0}, relay: relay, succeeded: false, state: desiredState});
+  });
 
 }; // _setRelay
 
-// TODO: rename a relay
-function _renameRelay(relay, newName, callback){
+// TODO: rename a relay; obj.relay, obj.oldName, obj.newName
+function _renameRelay(obj, callback){
 
   // ...
-  callback(null, true);
+  console.log(obj);
+  let timestamp = Math.round((new Date()).getTime() / 1000); // get unix timestamp, i.e. the seconds since start of unix epoch
+  let response = callback(err, {timestamp: {seconds: timestamp, nanos: 0}, relay: 1, succeeded: true});
+  callback(null, response);
 
 }; // _rename
 
@@ -236,28 +278,38 @@ server.addService(stub.service, {
 }); // server.addService
 
 // bind the serverCredentials instance we created earlier and then start the gRPC server
-server.bindAsync(address, serverCredentials, (err, port) => {
+server.bindAsync(address+':'+port, serverCredentials, (err, port) => {
 
   if (err){
 
-    log.fatal(err.message);
+    log.fatal('error when binding server: ' + err.message);
     process.exit(0);
 
   } else {
 
-    log.trace('server bound on '+address+', starting '+serverType+' server');
+    log.trace('server bound on '+address+':'+port+', starting...');
     server.start();
 
     _waitForServerToStart(server, 2500, 50)
     .then(() => {
-      log.debug(serverType+' server started and listening...');
-      bonjour.publish({ name: BONJOURNAME, type: 'http', port: port });
-      log.debug('advertising server via Bonjour/mDNS-SD');
-      _validateBonjourPublication();
+
+      log.debug('server started and listening...');
+
+      // advertise this server using MDNS
+      let txtRecord = {id: 'pi-relay', type: 'controller', ip: address, port: port};
+      advertisment = mdns.createAdvertisement(mdns.tcp('grpc'), port, {txtRecord: txtRecord});
+      advertisment.start();
+      log.debug('advertising server via mDNS-SD');
+
+      _validateMDNSPublication(); // look for the MDNS advertisement to ensure it was successfully published
+      _validategRPCserver(address, port); // validate that the gRPC server is running correctly
+
     })
     .catch((err) => {
+
       log.fatal(err.message);
       process.exit(0);
+
     }); // _waitForServerToStart
 
   }; // if

@@ -1,6 +1,8 @@
 # Pi Relay Controller Server
 This is the server application for the [Homey](https://homey.app/en-us/) app [Pi Relay Controller Homey](https://github.com/daviwil2/pi-relay-controller-homey) that runs on Raspberry Pi with the SB Components relay shield.
 
+To install, ```clone``` this repo or download the ```.zip``` file and unzip to a suitable directory e.g. ```/var/www```, then start the server with ```npm start```.
+
 Configuration is via the ```config.yaml``` file where defaults and GPIO mappings can be edited should another relay board be used.
 
 The [@grpc/grpc-js](https://www.npmjs.com/package/@grpc/grpc-js) and [@grpc/proto-loader](https://www.npmjs.com/package/@grpc/proto-loader) libraries are used to implement gRPC functionality.

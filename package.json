@@ -19,7 +19,7 @@
     "bunyan": "^1.8.15",
     "bunyan-format": "^0.2.1",
     "js-yaml": "^4.1.0",
-    "lodash": "^4.17.20",
+    "lodash": "^4.17.21",
     "lowdb": "^1.0.0",
     "mdns": "^2.7.2",
     "os-monitor": "^1.0.10",

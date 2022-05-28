@@ -15,7 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "@grpc/grpc-js": "^1.2.12",
-    "@grpc/proto-loader": "^0.6.1",
+    "@grpc/proto-loader": "^0.6.12",
     "bunyan": "^1.8.15",
     "bunyan-format": "^0.2.1",
     "js-yaml": "^4.1.0",
